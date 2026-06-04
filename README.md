@@ -598,6 +598,25 @@ await searchCommand.ExecuteAsync("hello");          // uses internal CTS
 await searchCommand.ExecuteAsync("hello", myToken); // linked with external token
 ```
 
+### Weak-Reference Event Subscriptions
+
+```csharp
+// Prevents the long-lived model from keeping a short-lived subscriber alive.
+// The subscription is automatically pruned when the subscriber is collected.
+INotifyPropertyChanged model = new PersonViewModel();
+
+// Subscribe — handler stored as a weak reference
+IDisposable token = model.WeakSubscribe((s, e) =>
+    Console.WriteLine($"{e.PropertyName} changed"));
+
+// Works identically for INotifyPropertyChanging
+IDisposable token2 = ((INotifyPropertyChanging)model).WeakSubscribe((s, e) =>
+    Console.WriteLine($"{e.PropertyName} changing"));
+
+// Dispose the token to remove the subscription eagerly (optional)
+token.Dispose();
+```
+
 ## 🎛️ Advanced Scenarios
 
 ### Custom Event Arguments
@@ -680,6 +699,7 @@ The library is designed to minimize memory allocations:
 - Event argument objects are reused where possible
 - Collection change notifications use efficient data structures
 - Property change detection uses optimized equality comparisons
+- `WeakSubscribe` extension methods prevent long-lived sources from keeping short-lived subscribers alive
 
 ## 📔 API Reference
 
@@ -690,7 +710,7 @@ The library is designed to minimize memory allocations:
 - **`BB84.Notifications.Components`** - Event argument classes and delegates
 - **`BB84.Notifications.Commands`** - Command pattern implementations
 - **`BB84.Notifications.Attributes`** - Notification attributes
-- **`BB84.Notifications.Extensions`** - Utility extensions
+- **`BB84.Notifications.Extensions`** - Utility extensions (`TaskExtensions`, `WeakEventExtensions`)
 
 ### Key Classes
 
