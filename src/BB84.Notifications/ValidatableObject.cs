@@ -67,6 +67,30 @@ public abstract class ValidatableObject : NotifiableObject, Interfaces.IValidata
   }
 
   /// <summary>
+  /// Sets the specified property to a new value using a custom equality comparer and performs validation.
+  /// </summary>
+  /// <remarks>
+  /// This method behaves identically to <see cref="SetPropertyAndValidate{T}(ref T, T, string)"/> but
+  /// uses the supplied <paramref name="comparer"/> instead of <see cref="EqualityComparer{T}.Default"/>
+  /// to determine whether the value has actually changed.
+  /// </remarks>
+  /// <typeparam name="T">The type of the property value.</typeparam>
+  /// <param name="fieldValue">A reference to the backing field of the property.</param>
+  /// <param name="newValue">The new value to assign to the property.</param>
+  /// <param name="comparer">The equality comparer used to compare the current and new values.</param>
+  /// <param name="propertyName">
+  /// The name of the property being set. This parameter is optional and defaults to the caller's member name.
+  /// </param>
+  protected void SetPropertyAndValidate<T>(ref T fieldValue, T newValue, IEqualityComparer<T> comparer, [CallerMemberName] string propertyName = "")
+  {
+    if (!comparer.Equals(fieldValue, newValue))
+    {
+      SetProperty(ref fieldValue, newValue, comparer, propertyName);
+      Validate(newValue, propertyName);
+    }
+  }
+
+  /// <summary>
   /// Raises the <see cref="ErrorsChanged"/> event to notify subscribers that the validation
   /// errors for a specific property have changed.
   /// </summary>

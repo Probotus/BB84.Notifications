@@ -125,7 +125,7 @@ Concrete implementation of a notifiable property with implicit conversion suppor
 
 **Key Features:**
 
-- Automatic change detection using `EqualityComparer<T>`
+- Automatic change detection using `EqualityComparer<T>` or a custom `IEqualityComparer<T>`
 - Generic event arguments with typed values
 - Implicit conversion operators
 - Thread-safe property updates
@@ -169,7 +169,7 @@ Abstract base class providing property change infrastructure.
 
 **Key Features:**
 
-- `SetProperty` method for automatic change detection
+- `SetProperty` method for automatic change detection (default or custom `IEqualityComparer<T>`)
 - Attribute-based notification propagation
 - Reflection optimization with caching
 - Support for computed properties
@@ -273,7 +273,6 @@ public class PersonViewModel : NotifiableObject
 ```csharp
 public class ProductViewModel
 {
-    public INotifiableProperty<string> Name { get; set; } = new NotifiableProperty<string>("Default Name");
     public INotifiableProperty<decimal> Price { get; set; } = new NotifiableProperty<decimal>(0m);
     public INotifiableProperty<int> Quantity { get; set; } = new NotifiableProperty<int>(1);
 
@@ -282,6 +281,42 @@ public class ProductViewModel
         // Subscribe to property changes
         Name.PropertyChanged += (s, e) => Console.WriteLine($"Name changed to: {Name.Value}");
         Price.PropertyChanged += (s, e) => Console.WriteLine($"Price changed to: {Price.Value:C}");
+    }
+}
+```
+
+### Custom Equality Comparer
+
+Supply a custom `IEqualityComparer<T>` to control when a change is considered meaningful:
+
+```csharp
+// NotifiableProperty<T> — case-insensitive string comparison
+INotifiableProperty<string> tag = new NotifiableProperty<string>("hello", StringComparer.OrdinalIgnoreCase);
+tag.Value = "HELLO"; // no event raised — considered equal
+
+// NotifiableObject — per-property comparer in SetProperty
+public class DocumentViewModel : NotifiableObject
+{
+    private string _title = string.Empty;
+
+    public string Title
+    {
+        get => _title;
+        // case-insensitive: "Hello" and "hello" are the same title
+        set => SetProperty(ref _title, value, StringComparer.OrdinalIgnoreCase);
+    }
+}
+
+// ValidatableObject — same pattern for SetPropertyAndValidate
+public class UserViewModel : ValidatableObject
+{
+    private string _email = string.Empty;
+
+    [Required, EmailAddress]
+    public string Email
+    {
+        get => _email;
+        set => SetPropertyAndValidate(ref _email, value, StringComparer.OrdinalIgnoreCase);
     }
 }
 ```
@@ -609,16 +644,16 @@ The library is designed to minimize memory allocations:
 
 ### Key Classes
 
-| Class                   | Description                                | Key Features                             |
-| ----------------------- | ------------------------------------------ | ---------------------------------------- |
-| `NotifiableProperty<T>` | Generic property with change notifications | Implicit operators, typed events         |
-| `ReversibleProperty<T>` | Property with value history                | Undo/redo, configurable history          |
-| `NotifiableObject`      | Base class for notifiable objects          | SetProperty, attribute support           |
-| `NotifiableCollection`      | Base class for notifiable collections          | Before/after events, typed notifications |
-| `NotifiableCollection<T>`   | Generic ready-to-use observable list           | `IList<T>`, `IReadOnlyList<T>`, full notifications |
-| `ValidatableObject`     | Base class with validation                 | Data annotations, error notifications    |
-| `ActionCommand`         | Synchronous command implementation         | CanExecute logic, parameter support      |
-| `AsyncActionCommand`    | Asynchronous command implementation        | Exception handling, cancellation         |
+| Class                     | Description                                | Key Features                                       |
+| ------------------------- | ------------------------------------------ | -------------------------------------------------- |
+| `NotifiableProperty<T>`   | Generic property with change notifications | Implicit operators, typed events                   |
+| `ReversibleProperty<T>`   | Property with value history                | Undo/redo, configurable history                    |
+| `NotifiableObject`        | Base class for notifiable objects          | SetProperty, attribute support                     |
+| `NotifiableCollection`    | Base class for notifiable collections      | Before/after events, typed notifications           |
+| `NotifiableCollection<T>` | Generic ready-to-use observable list       | `IList<T>`, `IReadOnlyList<T>`, full notifications |
+| `ValidatableObject`       | Base class with validation                 | Data annotations, error notifications              |
+| `ActionCommand`           | Synchronous command implementation         | CanExecute logic, parameter support                |
+| `AsyncActionCommand`      | Asynchronous command implementation        | Exception handling, cancellation                   |
 
 ### Event Types
 

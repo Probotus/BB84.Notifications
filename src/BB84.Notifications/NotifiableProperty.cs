@@ -22,7 +22,17 @@ namespace BB84.Notifications;
 /// <param name="value">The initial value of the property.</param>
 public sealed class NotifiableProperty<T>(T value) : INotifiableProperty<T>
 {
+  private readonly IEqualityComparer<T> _comparer = EqualityComparer<T>.Default;
   private T _value = value;
+
+  /// <summary>
+  /// Initializes a new instance of the <see cref="NotifiableProperty{T}"/> class with an initial
+  /// value and a custom equality comparer.
+  /// </summary>
+  /// <param name="value">The initial value of the property.</param>
+  /// <param name="comparer">The equality comparer used to determine whether the value has changed.</param>
+  public NotifiableProperty(T value, IEqualityComparer<T> comparer) : this(value)
+    => _comparer = comparer;
 
   /// <inheritdoc/>
   public bool IsDefault => EqualityComparer<T>.Default.Equals(_value, default!);
@@ -57,7 +67,7 @@ public sealed class NotifiableProperty<T>(T value) : INotifiableProperty<T>
   /// <param name="newValue">The new value to assign to the property.</param>
   private void SetProperty(ref T fieldValue, T newValue)
   {
-    if (!EqualityComparer<T>.Default.Equals(fieldValue, newValue))
+    if (!_comparer.Equals(fieldValue, newValue))
     {
       PropertyChanging?.Invoke(this, new PropertyChangingEventArgs<T>(fieldValue));
       fieldValue = newValue;
