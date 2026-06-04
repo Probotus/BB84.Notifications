@@ -139,10 +139,14 @@ Extends notifiable properties with history and navigation capabilities.
 ```csharp
 public interface IReversibleProperty<T> : INotifiableProperty<T>
 {
-    bool CanNavigateNext { get; }
-    bool CanNavigatePrevious { get; }
+    int Count { get; }
+    int Index { get; }
+    bool HasNextValue { get; }
+    bool HasPreviousValue { get; }
     void NextValue();
     void PreviousValue();
+    void Clear();
+    IReadOnlyList<T> Snapshot();
 }
 ```
 
@@ -155,6 +159,9 @@ Implementation with configurable history size and value navigation.
 - Configurable history size (default: 10 values)
 - Forward/backward navigation through value history
 - Automatic history management
+- Configurable overflow strategy (`EvictOldest`, `EvictNewest`, `Throw`)
+- `Clear()` resets history to current value only, preserving event subscriptions
+- `Snapshot()` returns a read-only view of all history entries
 - Integration with notifiable property features
 
 ### 3. Notifiable Objects
@@ -328,21 +335,36 @@ public class EditableDocument
 {
     private const int HistorySize = 20;
 
+    // Default overflow: EvictOldest (circular buffer)
     public IReversibleProperty<string> Content { get; set; } =
         new ReversibleProperty<string>("Initial Content", HistorySize);
 
     public void Undo()
     {
-        if (Content.CanNavigatePrevious)
+        if (Content.HasPreviousValue)
             Content.PreviousValue();
     }
 
     public void Redo()
     {
-        if (Content.CanNavigateNext)
+        if (Content.HasNextValue)
             Content.NextValue();
     }
+
+    public void ResetHistory()
+    {
+        // Clears history to just the current value; all event subscriptions are preserved
+        Content.Clear();
+    }
+
+    public IReadOnlyList<string> GetHistory() => Content.Snapshot();
 }
+
+// Throw strategy — useful when a hard cap must not be silently exceeded
+var strict = new ReversibleProperty<string>("v1", size: 3, overflow: OverflowStrategy.Throw);
+
+// EvictNewest strategy — new values are silently discarded when full
+var capped = new ReversibleProperty<string>("v1", size: 3, overflow: OverflowStrategy.EvictNewest);
 ```
 
 ### Generic Collection
