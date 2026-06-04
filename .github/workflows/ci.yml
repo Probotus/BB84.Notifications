@@ -2,9 +2,9 @@ name: Continuous Integration
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
   pull_request:
-    branches: [ main ]
+    branches: [main]
 
 permissions:
   contents: read
@@ -27,6 +27,11 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@v5
 
+      - name: Install mono
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y mono-complete
+
       - name: Restore dependencies
         run: dotnet restore ${{ env.SOLUTION }}
 
@@ -41,4 +46,4 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: test-results
-          path: '**/TestResults/*.trx'
+          path: "**/TestResults/*.trx"
