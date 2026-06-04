@@ -75,7 +75,7 @@ The library supports multiple .NET framework versions:
 
 - **.NET Standard 2.0** - Maximum compatibility
 - **.NET Standard 2.1** - Enhanced performance features
-- **.NET Framework 4.67.2** - Legacy Windows applications
+- **.NET Framework 4.7.2** - Legacy Windows applications
 - **.NET Framework 4.8.1** - Latest .NET Framework
 - **.NET 8.0** - Modern .NET with latest features
 - **.NET 10.0** - Cutting-edge .NET version
@@ -201,6 +201,17 @@ Abstract base class for collections with change notifications.
 - Integration with standard collection interfaces
 - Support for batch operations
 
+#### NotifiableCollection&lt;T&gt;
+
+Ready-to-use generic observable list that wraps `List<T>`.
+
+**Key Features:**
+
+- Implements `IList<T>` and `IReadOnlyList<T>`
+- Full `CollectionChanging`/`CollectionChanged` notifications on all mutating operations (`Add`, `Insert`, `Remove`, `RemoveAt`, `Clear`, indexer set)
+- Constructor overload accepting an existing `IEnumerable<T>`
+- Integrates naturally with LINQ and data-binding frameworks
+
 ### 5. Validation Support
 
 #### IValidatableObject
@@ -299,7 +310,33 @@ public class EditableDocument
 }
 ```
 
-### Collection Notifications
+### Generic Collection
+
+```csharp
+// Ready-to-use generic observable list
+var items = new NotifiableCollection<string>();
+
+items.CollectionChanging += (sender, e) =>
+{
+    Console.WriteLine($"Collection about to {e.Action}");
+    if (e is CollectionChangingEventArgs<string> typed)
+        Console.WriteLine($"Item: {typed.Item}");
+};
+
+items.CollectionChanged += (sender, e) =>
+{
+    Console.WriteLine($"Collection {e.Action} completed");
+    if (e is CollectionChangedEventArgs<string> typed)
+        Console.WriteLine($"Item: {typed.Item}");
+};
+
+items.Add("Hello");      // raises CollectionChanging + CollectionChanged
+items.Insert(0, "World"); // raises CollectionChanging + CollectionChanged
+items.Remove("Hello");   // raises CollectionChanging + CollectionChanged
+items.Clear();           // raises CollectionChanging + CollectionChanged
+```
+
+### Custom Collection (Abstract Base)
 
 ```csharp
 public class ObservableStringCollection : NotifiableCollection, ICollection<string>
@@ -577,7 +614,8 @@ The library is designed to minimize memory allocations:
 | `NotifiableProperty<T>` | Generic property with change notifications | Implicit operators, typed events         |
 | `ReversibleProperty<T>` | Property with value history                | Undo/redo, configurable history          |
 | `NotifiableObject`      | Base class for notifiable objects          | SetProperty, attribute support           |
-| `NotifiableCollection`  | Base class for notifiable collections      | Before/after events, typed notifications |
+| `NotifiableCollection`      | Base class for notifiable collections          | Before/after events, typed notifications |
+| `NotifiableCollection<T>`   | Generic ready-to-use observable list           | `IList<T>`, `IReadOnlyList<T>`, full notifications |
 | `ValidatableObject`     | Base class with validation                 | Data annotations, error notifications    |
 | `ActionCommand`         | Synchronous command implementation         | CanExecute logic, parameter support      |
 | `AsyncActionCommand`    | Asynchronous command implementation        | Exception handling, cancellation         |

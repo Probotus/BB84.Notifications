@@ -25,3 +25,14 @@ namespace BB84.Notifications.Interfaces;
 [SuppressMessage("Naming", "CA1711", Justification = "Identifier is correct here")]
 public interface INotifiableCollection : INotifyCollectionChanged, INotifyCollectionChanging, INotifyPropertyChanged, INotifyPropertyChanging
 { }
+
+/// <summary>
+/// Represents a generic collection that provides notifications when its contents or properties change.
+/// </summary>
+/// <remarks>
+/// This interface extends <see cref="INotifiableCollection"/> by adding generic collection capabilities through
+/// implementing <see cref="IList{T}"/> and <see cref="IReadOnlyList{T}"/>.
+/// </remarks>
+/// <typeparam name="T">The type of elements in the collection.</typeparam>
+public interface INotifiableCollection<T> : INotifiableCollection, IList<T>, IReadOnlyList<T>
+{ }
