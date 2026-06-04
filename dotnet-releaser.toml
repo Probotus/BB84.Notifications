@@ -6,6 +6,7 @@ project = "BB84.Notifications.slnx"
 [github]
 user = "BoBoBaSs84"
 repo = "BB84.Notifications"
+version_prefix = "v"
 [test]
 enable = false
 [nuget]
