@@ -63,6 +63,37 @@ public abstract class NotifiableObject : INotifiableObject
   }
 
   /// <summary>
+  /// Updates the specified field with a new value using a custom equality comparer and raises
+  /// property change notifications.
+  /// </summary>
+  /// <remarks>
+  /// This method behaves identically to <see cref="SetProperty{T}(ref T, T, string)"/> but uses
+  /// the supplied <paramref name="comparer"/> instead of <see cref="EqualityComparer{T}.Default"/>
+  /// to determine whether the value has actually changed.
+  /// </remarks>
+  /// <typeparam name="T">The type of the property being updated.</typeparam>
+  /// <param name="fieldValue">A reference to the backing field of the property.</param>
+  /// <param name="newValue">The new value to assign to the property.</param>
+  /// <param name="comparer">The equality comparer used to compare the current and new values.</param>
+  /// <param name="propertyName">
+  /// The name of the property being updated.
+  /// This parameter is optional and automatically provided by the compiler if not explicitly specified.
+  /// </param>
+  protected void SetProperty<T>(ref T fieldValue, T newValue, IEqualityComparer<T> comparer, [CallerMemberName] string propertyName = "")
+  {
+    if (!comparer.Equals(fieldValue, newValue))
+    {
+      RaisePropertyChanging(propertyName, fieldValue);
+      RaiseChangingAttribute(propertyName);
+
+      fieldValue = newValue;
+
+      RaisePropertyChanged(propertyName, newValue);
+      RaiseChangedAttribute(propertyName);
+    }
+  }
+
+  /// <summary>
   /// Notifies subscribers that a property value has changed.
   /// </summary>
   /// <remarks>
