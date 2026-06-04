@@ -55,4 +55,17 @@ public interface IReversibleProperty<T> : INotifiableProperty<T>
   /// before retrieving the previous value from the sequence.
   /// </remarks>
   void PreviousValue();
+
+  /// <summary>
+  /// Resets the history to contain only the current value and sets <see cref="Index"/> to zero,
+  /// returning the property to the same state as after initial construction.
+  /// </summary>
+  void Clear();
+
+  /// <summary>
+  /// Returns a read-only snapshot of all values currently in the history, ordered from oldest
+  /// to most recent.
+  /// </summary>
+  /// <returns>A read-only list of all historical values.</returns>
+  IReadOnlyList<T> Snapshot();
 }

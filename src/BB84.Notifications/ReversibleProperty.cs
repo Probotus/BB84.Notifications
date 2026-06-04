@@ -17,31 +17,39 @@ namespace BB84.Notifications;
 /// <remarks>
 /// This class maintains a history of values up to a specified size, enabling the
 /// ability to move forward and backward through the recorded values. It is useful
-/// for scenarios where undo/redo functionality or value  tracking is required.
+/// for scenarios where undo/redo functionality or value tracking is required.
+/// When the history is full the behaviour is controlled by the <see cref="OverflowStrategy"/>
+/// supplied at construction time (default: <see cref="OverflowStrategy.EvictOldest"/>).
 /// </remarks>
 /// <typeparam name="T">The type of the property's value.</typeparam>
 public sealed class ReversibleProperty<T> : INotifiableProperty<T>, IReversibleProperty<T>
 {
   private const int DefaultSize = 10;
   private readonly int _size;
+  private readonly OverflowStrategy _overflow;
   private readonly List<T> _values;
   private T _value;
 
   /// <summary>
   /// Initializes a new instance of the <see cref="ReversibleProperty{T}"/> class
-  /// with the specified initial value and history size.
+  /// with the specified initial value, history size, and overflow strategy.
   /// </summary>
   /// <param name="value">The initial value of the property.</param>
   /// <param name="size">
-  /// The maximum number of previous values to retain in the history.
+  /// The maximum number of values to retain in the history.
   /// Defaults to 10 and must be a positive integer.
   /// </param>
-  public ReversibleProperty(T value, int size = DefaultSize)
+  /// <param name="overflow">
+  /// The strategy to apply when a new value is added and the history is already full.
+  /// Defaults to <see cref="OverflowStrategy.EvictOldest"/>.
+  /// </param>
+  public ReversibleProperty(T value, int size = DefaultSize, OverflowStrategy overflow = OverflowStrategy.EvictOldest)
   {
     _size = size;
+    _overflow = overflow;
     _values = new(size);
     _value = value;
-    AddValue(value);
+    _ = TryAddValue(value);
   }
 
   /// <inheritdoc/>
@@ -97,6 +105,18 @@ public sealed class ReversibleProperty<T> : INotifiableProperty<T>, IReversibleP
     SetProperty(ref _value, value, false);
   }
 
+  /// <inheritdoc/>
+  public void Clear()
+  {
+    _values.Clear();
+    _values.Add(_value);
+    Index = 0;
+  }
+
+  /// <inheritdoc/>
+  public IReadOnlyList<T> Snapshot()
+    => _values.AsReadOnly();
+
   /// <summary>
   /// Implicitly converts a value of type <typeparamref name="T"/> to a
   /// <see cref="ReversibleProperty{T}"/> instance.
@@ -120,27 +140,18 @@ public sealed class ReversibleProperty<T> : INotifiableProperty<T>, IReversibleP
   /// <summary>
   /// Updates the value of a property and raises the appropriate change notifications.
   /// </summary>
-  /// <remarks>
-  /// This method compares the current value and the new value using the default equality comparer
-  /// for the type. If the values are not equal, it updates the property value, optionally adds
-  /// the new value to an internal collection, and raises <see cref="PropertyChanging"/> and
-  /// <see cref="PropertyChanged"/> events.
-  /// </remarks>
-  /// <param name="oldValue">
-  /// A reference to the current value of the property.
-  /// This value will be updated to <paramref name="newValue"/> if the values are not equal.
-  /// </param>
+  /// <param name="oldValue">A reference to the current value. Updated to <paramref name="newValue"/> when not equal.</param>
   /// <param name="newValue">The new value to set for the property.</param>
-  /// <param name="addToArray">
-  /// A boolean value indicating whether the new value should be added to an internal collection.
-  /// <see langword="true"/> to add the new value to the collection; otherwise, <see langword="false"/>.
+  /// <param name="addToHistory">
+  /// <see langword="true"/> to record the new value in the history; <see langword="false"/> when
+  /// navigating the existing history (NextValue/PreviousValue).
   /// </param>
-  private void SetProperty(ref T oldValue, T newValue, bool addToArray = true)
+  private void SetProperty(ref T oldValue, T newValue, bool addToHistory = true)
   {
     if (!EqualityComparer<T>.Default.Equals(oldValue, newValue))
     {
-      if (addToArray)
-        AddValue(newValue);
+      if (addToHistory && !TryAddValue(newValue))
+        return;
 
       PropertyChanging?.Invoke(this, new PropertyChangingEventArgs<T>(oldValue));
       oldValue = newValue;
@@ -149,27 +160,47 @@ public sealed class ReversibleProperty<T> : INotifiableProperty<T>, IReversibleP
   }
 
   /// <summary>
-  /// Adds a value to the collection, maintaining a fixed maximum size.
+  /// Attempts to add a value to the history, respecting the configured <see cref="OverflowStrategy"/>.
   /// </summary>
-  /// <remarks>
-  /// If the collection has reached its maximum size, the oldest value is removed to make space
-  /// for the new value. The <see cref="Index"/> property is updated to reflect the position
-  /// of the newly added value.
-  /// </remarks>
-  /// <param name="value">The value to add to the collection.</param>
-  private void AddValue(T value)
+  /// <param name="value">The value to add.</param>
+  /// <returns>
+  /// <see langword="true"/> if the value was added (or replaced an existing entry);
+  /// <see langword="false"/> if the strategy is <see cref="OverflowStrategy.EvictNewest"/> and the
+  /// buffer is full — the caller should abort the assignment.
+  /// </returns>
+  /// <exception cref="InvalidOperationException">
+  /// Thrown when the strategy is <see cref="OverflowStrategy.Throw"/> and the buffer is full.
+  /// </exception>
+  private bool TryAddValue(T value)
   {
     if (_values.Count < _size)
     {
+      // If we are not at the end of the history (e.g. after navigating back),
+      // truncate the forward entries before recording the new value.
+      if (Index < _values.Count - 1)
+        _values.RemoveRange(Index + 1, _values.Count - Index - 1);
+
       _values.Add(value);
-      Index = _values.LastIndexOf(value);
-      return;
+      Index = _values.Count - 1;
+      return true;
     }
 
-    T[] array = new T[_size - 1];
-    _values.CopyTo(1, array, 0, _size - 1);
-    _values.Clear();
-    _values.AddRange(array);
-    _values.Add(value);
+    // Buffer is full — apply overflow strategy.
+    switch (_overflow)
+    {
+      case OverflowStrategy.EvictNewest:
+        return false;
+
+      case OverflowStrategy.Throw:
+        throw new InvalidOperationException(
+          $"The history buffer for {nameof(ReversibleProperty<>)} is full (size = {_size}). " +
+          $"Set a larger size or use a different {nameof(OverflowStrategy)}.");
+
+      default: // EvictOldest
+        _values.RemoveAt(0);
+        _values.Add(value);
+        Index = _values.Count - 1;
+        return true;
+    }
   }
 }
