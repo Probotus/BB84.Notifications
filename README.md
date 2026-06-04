@@ -249,7 +249,7 @@ Interfaces for asynchronous command execution.
 **Implementations:**
 
 - `ActionCommand` / `ActionCommand<T>` - Synchronous commands
-- `AsyncActionCommand` / `AsyncActionCommand<T>` - Asynchronous commands
+- `AsyncActionCommand` / `AsyncActionCommand<T>` - Asynchronous commands with optional `CancellationToken` support, `Cancel()` method, and bindable `CancelCommand`
 
 ## 🧰 Usage Guide
 
@@ -536,10 +536,11 @@ public class MainViewModel : NotifiableObject
             canExecute: () => !string.IsNullOrEmpty(SearchText)
         );
 
+        // Cancellable async command — receives a CancellationToken automatically
         SearchCommand = new AsyncActionCommand<string>(
-            execute: async (query) => await PerformSearchAsync(query),
-            canExecute: (query) => !IsSearching && !string.IsNullOrWhiteSpace(query),
-            onException: (ex) => Console.WriteLine($"Search failed: {ex.Message}")
+            execute: async (query, ct) => await PerformSearchAsync(query, ct),
+            canExecute: (query) => !string.IsNullOrWhiteSpace(query),
+            action: (ex) => Console.WriteLine($"Search failed: {ex.Message}")
         );
 
         // Update command states when properties change
@@ -553,13 +554,12 @@ public class MainViewModel : NotifiableObject
         };
     }
 
-    private async Task PerformSearchAsync(string query)
+    private async Task PerformSearchAsync(string query, CancellationToken ct)
     {
         IsSearching = true;
         try
         {
-            // Simulate async search
-            await Task.Delay(2000);
+            await Task.Delay(2000, ct);
             // Perform actual search logic here
         }
         finally
@@ -568,6 +568,34 @@ public class MainViewModel : NotifiableObject
         }
     }
 }
+```
+
+### Cancelling an Async Command
+
+```csharp
+// Non-generic variant
+IAsyncActionCommand loadCommand = new AsyncActionCommand(
+    execute: async ct => await LoadDataAsync(ct),
+    canExecute: () => true
+);
+
+// Bind CancelCommand directly in the UI (e.g., a Cancel button)
+// CancelCommand.CanExecute() returns true only while loadCommand is executing
+IActionCommand cancelButton = loadCommand.CancelCommand;
+
+// Programmatic cancellation
+loadCommand.Cancel();
+
+// Check whether cancellation was requested
+bool wasCancelled = loadCommand.IsCancellationRequested;
+
+// Generic variant with parameter
+IAsyncActionCommand<string> searchCommand = new AsyncActionCommand<string>(
+    execute: async (query, ct) => await SearchAsync(query, ct)
+);
+
+await searchCommand.ExecuteAsync("hello");          // uses internal CTS
+await searchCommand.ExecuteAsync("hello", myToken); // linked with external token
 ```
 
 ## 🎛️ Advanced Scenarios
